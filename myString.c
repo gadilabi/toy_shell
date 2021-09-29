@@ -1,4 +1,6 @@
+#define _BSD_SOURCE
 #include <stdio.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
@@ -6,8 +8,8 @@
 #include "myArray.h"
 
 char * concat(char * head, char * tail ){
-	int headLength = strlen(head);
-	int tailLength = strlen(tail);
+	int headLength = (int) strlen(head);
+	int tailLength = (int) strlen(tail);
 	int mergedLength = headLength + tailLength + 1;
 	char * merged = malloc(sizeof(char)*mergedLength);
 
@@ -51,6 +53,7 @@ char * firstWord(char * line){
 			break;
 			
 	}
+	first[counter] = '\0';
 
 	return first;
 
@@ -78,7 +81,7 @@ struct array * sepStr(char * str, char delim){
 			// Terminate the string
 			commandStr[strCounter] = '\0';
 
-			if(strlen(commandStr)>0){
+			if((int) strlen(commandStr)>0){
 				// Add commandStr to the sep array
 				sep->addElement(sep, &commandStr);
 
@@ -109,7 +112,7 @@ struct array * sepStr(char * str, char delim){
 	/* SEARCH HERE */
 	if(commandCounter>0){
 		// Terminate the string
-		commandStr[strCounter] = '\0';
+		commandStr[commandCounter] = '\0';
 
 		// Add commandStr to the sep array
 		sep->addElement(sep, &commandStr);
@@ -118,12 +121,18 @@ struct array * sepStr(char * str, char delim){
 
 	return sep;
 }
+
+
 /*
 int main(){
-	char * str1 = "world";
-	char * str2 = "hello ";
-	char * merged = concat(str2, str1);
-	printf("%s\n", merged);
+	char * str = "cd ..";
+	while(1){
+		Array * sep = sepStr(str, ' ');
+		sep->print(sep);
+		free(sep);
+		usleep(100000);
+	}
 	return 0;
 }
+
 */

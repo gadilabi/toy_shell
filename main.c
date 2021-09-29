@@ -1,3 +1,4 @@
+#define _BSD_SOURCE
 #define _POSIX_C_SOURCE 200809L
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -32,9 +33,8 @@ int main(int argc, char * argv[]){
 		
 		char * first = firstWord(*buffer);
 		enum CommandType type = checkType(first);
-		int commandLength = strlen(*buffer);
+		int commandLength = (int) strlen(*buffer);
 		(*buffer)[commandLength-1] = '\0';
-		printf("%s", *buffer);
 
 		if(type == BUILT_IN)
 			exec_built_in(*buffer, first);
@@ -43,10 +43,12 @@ int main(int argc, char * argv[]){
 			exec_external(*buffer);
 
 		commandPrompt = createPrompt();
-		printf("\n%s", getcwd(NULL, 0));
-		printf("\n%p", commandPrompt);
 		printf("\n%s", commandPrompt);
+		
 		free(commandPrompt);
+		free(first);
+		commandPrompt = NULL;
+		first = NULL;
 		
 	}
 }
@@ -77,7 +79,6 @@ int exec_built_in(char * command, char * first){
 }
 
 int changeDir(char * command){
-	printf("change dir\n");
 	Array * sepCommad = sepStr(command, ' ');
 	if(sepCommad->length != 2 )
 		return -1;
@@ -123,6 +124,7 @@ char * createPrompt(void){
 	char * currentDir = getcwd(NULL, 0);
 	char * commandPrompt =concat(concat("wish|", currentDir), "> ") ; 
 	free(currentDir);
+	currentDir = NULL;
 
 	return commandPrompt;
 }
