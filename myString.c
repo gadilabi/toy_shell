@@ -7,6 +7,22 @@
 #include <ctype.h>
 #include "myArray.h"
 
+char * stripChar(char * str, char del){
+	int length = (int) strlen(str);
+	char * stripped = malloc(1 + length*sizeof(char));
+	int strippedLength = 0;
+
+	for(int i=0; i<length; i++){
+		if(str[i]==del)
+			continue;
+		stripped[strippedLength] = str[i];
+		strippedLength++;
+	}
+
+	return stripped;
+	
+}
+
 char * concat(char * head, char * tail ){
 	int headLength = (int) strlen(head);
 	int tailLength = (int) strlen(tail);
@@ -123,16 +139,12 @@ struct array * sepStr(char * str, char delim){
 }
 
 
+
 /*
 int main(){
-	char * str = "cd ..";
-	while(1){
-		Array * sep = sepStr(str, ' ');
-		sep->print(sep);
-		free(sep);
-		usleep(100000);
-	}
-	return 0;
+	char * str = "hello world!";
+	char * strip = stripChar(str, '!');
+	printf("%s\n", strip);
 }
-
 */
+

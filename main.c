@@ -7,10 +7,17 @@
 #include <string.h>
 #include <errno.h>
 #include <wait.h>
+#include <fcntl.h>
 #include "myString.h"
 #include "myArray.h"
 
 Array * PATH;
+
+typedef struct Buffer{
+	char * buffer;
+	int size;
+	int e;
+} Buffer;
 
 enum CommandType{
 	BUILT_IN, EXTERNAL
@@ -27,6 +34,7 @@ int changeDir(char * command);
 int exec_output_indirection(char * command, enum Redirection type);
 int exec_input_indirection(char * command);
 int exec_straight(char * command);
+Buffer * exec_buffer(char * command);
 enum Redirection checkRedirection(char * command);
 char * createPrompt(void);
 enum CommandType checkType(char * command);
@@ -140,9 +148,41 @@ int exec_input_indirection(char * command){
 
 int exec_output_indirection(char * command, enum Redirection type){
 
+	// Split the command
+	Array * splitCommand = sepStr(command, '>');
+
+	char * actualCommad = *(char **) splitCommand->get(splitCommand, 0);
+	char * target = * (char **) splitCommand->get(splitCommand, 1);
+	target = stripChar(target, ' ');
+
+	// File descriptor of target
+	int fd;
+
+	if(type == OUTPUT_REDIRECTION_A)
+		fd = open(target,O_WRONLY | O_APPEND | O_CREAT, 0777);
+	else
+		fd = open(target, O_WRONLY | O_CREAT, 0777);
+
+	Buffer * outBuffer = exec_buffer(actualCommad);
+
+	// Read from the pipe into inBuffer
+	write(fd, outBuffer->buffer, outBuffer->size);
+
+	close(fd);
 }
 
-int exec_straight(char * completeCommand){
+int exec_straight(char * command){
+	Buffer * outBuffer = exec_buffer(command);
+
+	// Read from the pipe into inBuffer
+	write(STDOUT_FILENO, outBuffer->buffer, outBuffer->size);
+
+}
+
+Buffer * exec_buffer(char * completeCommand){
+
+	// Buffer to be returned
+	Buffer * retBuffer = malloc(sizeof(Buffer));
 
 	// Split the argument into array of commands
 	struct array * commandList = sepStr(completeCommand, '|');
@@ -177,8 +217,10 @@ int exec_straight(char * completeCommand){
 		int cpid = fork();
 
 		// If fork failed
-		if(cpid == -1)
-			return -1;
+		if(cpid == -1){
+			retBuffer->e = -1;
+			return retBuffer;
+		}
 
 		if(cpid == 0){
 			// Close parent side of the pipe
@@ -215,7 +257,8 @@ int exec_straight(char * completeCommand){
 				dup2(out, STDOUT_FILENO);
 				printf("fail\n");
 				printf("%s\n", strerror(errno));
-				return -1;
+				retBuffer->e = -1;
+				return retBuffer;
 
 			}
 
@@ -261,8 +304,12 @@ int exec_straight(char * completeCommand){
 }
 
 // Read from the pipe into inBuffer
-write(STDOUT_FILENO, inBuffer, outputSize);
+//write(STDOUT_FILENO, inBuffer, outputSize);
 
+retBuffer->buffer = inBuffer;
+retBuffer->size = outputSize;
+
+return retBuffer;
 
 }
 
