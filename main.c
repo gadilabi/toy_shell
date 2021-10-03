@@ -30,6 +30,7 @@ enum Redirection{
 int exec_built_in(char * command, char * first);
 void exec_external(char * command);
 int setPath(char * command);
+int setEnvPath(char * command);
 int changeDir(char * command);
 int exec_output_indirection(char * command, enum Redirection type);
 int exec_input_indirection(char * command);
@@ -92,6 +93,27 @@ int main(int argc, char * argv[]){
 	}
 }
 
+int setEnvPath(char * command){
+	
+	int commandLength = (int) strlen(command);
+	char * path = "";
+	int pathCounter = 0;
+	char * current;
+	Array * pathArray = sepStr(command, ' ');
+	for(int i=0; i<pathArray->length; i++){
+		current = * (char **) pathArray->get(pathArray, i);
+		path = concat(path, current);
+		if(i<pathArray->length-1)
+			path = concat(path, ":");
+		
+	}
+
+	setenv("PATH", path, 1);
+	
+	return 0;
+	
+}
+
 int exec_built_in(char * command, char * first){
 	if(strcmp(first, "cd") == 0){
 		int status = changeDir(command);
@@ -103,7 +125,7 @@ int exec_built_in(char * command, char * first){
 	}
 
 	if(strcmp(first, "path") == 0){
-		int status = setPath(command);
+		int status = setEnvPath(command);
 		if(status!=0)
 			return 2;
 		else
@@ -142,8 +164,60 @@ int setPath(char * command){
 	return 0;
 }
 
-int exec_input_indirection(char * command){
+int exec_input_indirection(char * completeCommand){
 
+	/* 
+	Split the complete command into the command
+	itself and the source file to be read into stdin
+	*/
+	Array * split = sepStr(completeCommand, '<');
+	char * command = * (char **) split->get(split, 0);
+	char * source = * (char **) split->get(split, 1);
+	command = stripChar(command, ' ');
+	source = stripChar(source, ' ');
+
+	// Open the source file
+	int sourcefd = open(source, O_RDONLY);
+
+	// Create the pipe
+	int pfd[2];
+	pipe(pfd);
+	int childRead = pfd[0];
+	int parentWrite = pfd[1];
+
+	int cpid = fork();
+
+	if(cpid==-1)
+		return -1;
+
+	// Child
+	if(cpid==0){
+		// Process is not going to send info to parent so close write pipe
+		close(parentWrite);
+
+		// Save stdin in a new fd
+		int in = dup(STDIN_FILENO);
+
+		// Redirect the stdin into the source
+		dup2(sourcefd, STDIN_FILENO);
+		close(sourcefd);
+
+		// Arguments list consists of command and null terminated
+		char ** args = malloc(2*sizeof(char *));
+		args[0] = command;
+		args[1] = NULL;
+
+		int status = execvp(command, args);
+
+		if(status==-1)
+			exit(-1);
+	
+	}else{
+		close(childRead);
+		close(parentWrite);
+		wait(NULL);
+	
+	}
 }
 
 int exec_output_indirection(char * command, enum Redirection type){
@@ -173,9 +247,13 @@ int exec_output_indirection(char * command, enum Redirection type){
 
 int exec_straight(char * command){
 	Buffer * outBuffer = exec_buffer(command);
+	if(outBuffer->e!=0)
+		return -1;
 
 	// Read from the pipe into inBuffer
-	write(STDOUT_FILENO, outBuffer->buffer, outBuffer->size);
+	int status = write(STDOUT_FILENO, outBuffer->buffer, outBuffer->size);
+
+	return status;
 
 }
 
@@ -258,7 +336,7 @@ Buffer * exec_buffer(char * completeCommand){
 				printf("fail\n");
 				printf("%s\n", strerror(errno));
 				retBuffer->e = -1;
-				return retBuffer;
+				exit(-1);
 
 			}
 
@@ -300,9 +378,12 @@ Buffer * exec_buffer(char * completeCommand){
 		write(parentWrite, inBuffer, outputSize);
 	}
 
-
 }
 
+close(parentWrite);
+close(parentRead);
+close(childRead);
+close(childWrite);
 // Read from the pipe into inBuffer
 //write(STDOUT_FILENO, inBuffer, outputSize);
 
